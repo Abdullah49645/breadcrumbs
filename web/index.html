@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Breadcrumbs — how close can AI get to your home?</title>
+  <meta name="description" content="Breadcrumbs shows how an AI geolocator narrows down where you live by combining the photos you've already posted, and which photos to hold back.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='8' cy='24' r='3' fill='%23d6402b'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%23d6402b' opacity='.7'/%3E%3Ccircle cx='24' cy='8' r='3' fill='%23d6402b' opacity='.45'/%3E%3C/svg%3E">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#" data-nav="home">
+      <span class="crumbs"><i></i><i></i><i></i></span>
+      Breadcrumbs
+    </a>
+    <nav class="topnav">
+      <span class="pill" id="modePill" hidden></span>
+      <a href="#" data-nav="home">New check</a>
+      <a href="https://github.com/Abdullah49645/breadcrumbs" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </header>
+
+  <!-- ============================== LANDING ============================== -->
+  <main id="landing" class="landing">
+    <section class="hero">
+      <p class="eyebrow">A location-privacy check for anyone who posts photos</p>
+      <h1>Every photo you post is a <em>breadcrumb</em>.</h1>
+      <p class="lede">One photo of your street says “a big city.” Ten of them say <strong>which block</strong>.
+        Breadcrumbs replays your public photos through an AI geolocator, shows the moment it finds your neighbourhood,
+        and tells you exactly which photos to hold back.</p>
+      <div class="cta-row">
+        <button class="btn primary" id="startDemo">Watch it find a home <span>→</span></button>
+        <button class="btn ghost" id="startOwn">Check my own photos</button>
+      </div>
+      <p class="fineprint">No account. The demo runs entirely in your browser. Your own photos are analysed by a local server and never stored.</p>
+    </section>
+
+    <section class="how">
+      <div class="how-card">
+        <span class="num">01</span>
+        <h3>Replay your feed</h3>
+        <p>Photos are added one at a time, in the order you posted them. Watch the AI's belief about where you live sharpen with each one.</p>
+      </div>
+      <div class="how-card">
+        <span class="num">02</span>
+        <h3>Find the giveaways</h3>
+        <p>Leave-one-out testing ranks which photos do the damage, and region-by-region blurring shows which part of each photo leaks.</p>
+      </div>
+      <div class="how-card">
+        <span class="num">03</span>
+        <h3>Get a fix plan</h3>
+        <p>A search finds the smallest set of changes that pushes the AI's guess out of your neighbourhood, then re-runs the model to prove it.</p>
+      </div>
+    </section>
+
+    <section class="why">
+      <div>
+        <h2>Single-photo tools miss the real risk.</h2>
+        <p>Stripping GPS and blurring faces protects one image. But a stalker doesn't look at one image — they look at your feed.
+          A snowy street, a bookstore, a playground: each is vague alone. Together they triangulate.
+          Breadcrumbs measures that <em>combined</em> leak.</p>
+      </div>
+      <ul class="facts">
+        <li><b>Multi-photo fusion</b><span>product-of-experts over ~1.7&nbsp;km cells, with the model's photo-density prior divided out</span></li>
+        <li><b>Measured, not guessed</b><span>every claim comes from re-running the model, not from asking it to explain itself</span></li>
+        <li><b>Defensive by design</b><span>analyses only photos you upload; no profile lookups, no scraping</span></li>
+      </ul>
+    </section>
+  </main>
+
+  <!-- ============================== UPLOAD ============================== -->
+  <main id="upload" class="upload" hidden>
+    <div class="upload-card">
+      <h2>Check your own photos</h2>
+      <p class="muted">Pick 2–24 photos you've posted publicly, in the order you posted them. GPS tags are stripped before analysis, so the AI sees only pixels.</p>
+      <label class="drop" id="drop">
+        <input type="file" id="fileInput" accept="image/*" multiple>
+        <span class="drop-title">Drop photos here or click to choose</span>
+        <span class="drop-sub" id="dropSub">JPEG or PNG</span>
+      </label>
+      <div class="thumbs" id="thumbs"></div>
+      <div class="home-pick">
+        <div>
+          <h3>Optional: mark your home</h3>
+          <p class="muted">Click the map. The pin stays on your machine and is only used to measure how close the AI gets.</p>
+        </div>
+        <div id="homeMap" class="home-map"></div>
+      </div>
+      <div class="upload-actions">
+        <span class="muted" id="serverNote"></span>
+        <button class="btn primary" id="runOwn" disabled>Analyse photos</button>
+      </div>
+      <div class="progress" id="progress" hidden><div class="bar"><i id="progressBar"></i></div><span id="progressText">Encoding photos…</span></div>
+    </div>
+  </main>
+
+  <!-- ============================== ANALYSIS ============================== -->
+  <main id="analysis" class="analysis" hidden>
+    <aside class="rail">
+      <div class="rail-head">
+        <h4>Posted photos</h4>
+        <span class="muted" id="railCount"></span>
+      </div>
+      <ol class="feed" id="feed"></ol>
+    </aside>
+
+    <section class="mapwrap">
+      <div id="map"></div>
+      <div class="map-legend">
+        <span><i class="lg home"></i>Your home</span>
+        <span><i class="lg ring"></i>Your neighbourhood (2 km)</span>
+        <span><i class="lg guess"></i>AI's best guess</span>
+        <span><i class="lg area"></i>search area (75% of belief)</span>
+      </div>
+      <div class="photo-pop" id="photoPop" hidden>
+        <img id="popImg" alt="">
+        <div class="pop-meta"><span id="popIdx"></span><span id="popAlone"></span></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-tab="replay"><b>1</b> Replay</button>
+        <button class="tab" data-tab="leaks"><b>2</b> Giveaways</button>
+        <button class="tab" data-tab="fix"><b>3</b> Fix plan</button>
+      </div>
+
+      <div class="tabpane" id="tab-replay">
+        <p class="kicker" id="stepLabel">Before any photos</p>
+        <div class="gauge">
+          <div class="gauge-num"><span id="oddsNum">0</span><small>%</small></div>
+          <div class="gauge-cap">chance the AI picks <b>your neighbourhood</b><br><span class="muted">(within 2 km of home)</span></div>
+        </div>
+        <div class="spark" id="spark"></div>
+        <div class="stats">
+          <div><span class="stat" id="statGuess">—</span><span class="label">best guess from home</span></div>
+          <div><span class="stat" id="statArea">—</span><span class="label">search radius (75% of belief)</span></div>
+        </div>
+        <p class="note" id="replayNote">Press play to add the photos one by one.</p>
+        <div class="controls">
+          <button class="btn primary" id="playBtn">▶ Play feed</button>
+          <button class="btn ghost small" id="stepBack">←</button>
+          <button class="btn ghost small" id="stepFwd">→</button>
+        </div>
+      </div>
+
+      <div class="tabpane" id="tab-leaks" hidden>
+        <p class="kicker">Leave-one-out: how much each photo adds</p>
+        <ol class="rank" id="rank"></ol>
+        <div class="leak-detail" id="leakDetail">
+          <p class="muted">Select a photo to see which part of it leaks.</p>
+        </div>
+      </div>
+
+      <div class="tabpane" id="tab-fix" hidden>
+        <p class="kicker">Smallest change that moves the guess out of your neighbourhood</p>
+        <ol class="plan" id="plan"></ol>
+        <div class="after" id="after"></div>
+        <div class="controls">
+          <button class="btn primary" id="applyFix">Apply fix plan</button>
+          <button class="btn ghost small" id="undoFix" hidden>Undo</button>
+        </div>
+      </div>
+
+      <footer class="panel-foot">
+        <span id="modelNote"></span>
+      </footer>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
